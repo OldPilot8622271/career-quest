@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { motion, Variants, AnimatePresence } from 'framer-motion';
-import { FileSearch, UploadCloud, Loader2, Sparkles, HelpCircle, FileText, X, AlertCircle } from 'lucide-react';
+import { FileSearch, UploadCloud, Loader2, Sparkles, HelpCircle, FileText, X, AlertCircle, BookOpen } from 'lucide-react';
 
 interface AnalyzedQuestion {
   questionText: string;
   topic: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
   hint: string;
+  explanation?: string; // 🔥 Added field to store the on-demand explanation
 }
 
 interface PaperAnalysis {
@@ -25,6 +26,9 @@ export default function PaperAnalyzerPage() {
   const [analysis, setAnalysis] = useState<PaperAnalysis | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string>('Physics');
+  
+  // 🔥 Track which specific question is currently fetching an explanation
+  const [explainingIdx, setExplainingIdx] = useState<number | null>(null);
 
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -110,7 +114,6 @@ export default function PaperAnalyzerPage() {
       const res = await fetch('/api/analyze-paper', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // 🔥 Send the selected subject filter directly to the API
         body: JSON.stringify({ images: base64Images, subject: selectedSubject }),
       });
 
@@ -127,6 +130,40 @@ export default function PaperAnalyzerPage() {
       setErrorMsg(err.message || "Failed to analyze the files. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 🔥 NEW: On-Demand Explanation Fetcher
+  const fetchExplanation = async (index: number) => {
+    if (!analysis || explainingIdx !== null) return;
+    
+    setExplainingIdx(index);
+    try {
+      const targetQuestion = analysis.questions[index];
+      const res = await fetch('/api/explain-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          questionText: targetQuestion.questionText, 
+          topic: targetQuestion.topic,
+          hint: targetQuestion.hint
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch explanation");
+
+      // Update the specific question in the state array with the new explanation
+      if (data.explanation) {
+        const updatedQuestions = [...analysis.questions];
+        updatedQuestions[index].explanation = data.explanation;
+        setAnalysis({ ...analysis, questions: updatedQuestions });
+      }
+    } catch (err) {
+      console.error("Explanation error:", err);
+      alert("Failed to generate explanation. Please try again.");
+    } finally {
+      setExplainingIdx(null);
     }
   };
 
@@ -197,7 +234,6 @@ export default function PaperAnalyzerPage() {
               </div>
             )}
 
-            {/* 🔥 NEW: Subject Selector Tabs */}
             <div className="space-y-2 mt-4">
               <span className="block text-xs font-black uppercase text-gray-500">Target Subject</span>
               <div className="flex flex-wrap gap-2">
@@ -278,13 +314,34 @@ export default function PaperAnalyzerPage() {
                       {q.questionText}
                     </p>
 
-                    <div className="bg-[#FAF8F5] border-2 border-black p-3 rounded-xl flex items-start gap-3">
+                    <div className="bg-[#FAF8F5] border-2 border-black p-3 rounded-xl flex items-start gap-3 mb-4">
                       <HelpCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                       <div>
                         <span className="block text-[10px] font-black uppercase text-gray-500 mb-0.5">AI Hint</span>
                         <p className="text-sm font-bold text-gray-800">{q.hint}</p>
                       </div>
                     </div>
+
+                    {/* 🔥 NEW: Explanation Toggle Section */}
+                    {!q.explanation ? (
+                      <button 
+                        onClick={() => fetchExplanation(idx)}
+                        disabled={explainingIdx !== null}
+                        className="w-full flex items-center justify-center gap-2 py-2 border-2 border-black rounded-xl font-black text-xs uppercase bg-white hover:bg-gray-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50 cursor-pointer"
+                      >
+                        {explainingIdx === idx ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
+                        {explainingIdx === idx ? 'Fetching Explanation...' : 'Request Step-by-Step Explanation'}
+                      </button>
+                    ) : (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-[#DBEAFE] border-2 border-black p-4 rounded-xl">
+                        <span className="block text-[10px] font-black uppercase text-blue-800 mb-2 flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" /> Expert Explanation
+                        </span>
+                        <p className="text-sm font-bold text-gray-900 leading-relaxed whitespace-pre-wrap">
+                          {q.explanation}
+                        </p>
+                      </motion.div>
+                    )}
                   </div>
                 ))}
               </div>
