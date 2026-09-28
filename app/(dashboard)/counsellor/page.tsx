@@ -9,7 +9,6 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Send, Plus, Trash2, Bot, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 
-// 🌟 IMPORT FRAMER MOTION
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Message {
@@ -61,7 +60,7 @@ function CounsellorChatContent() {
     return () => unsubscribe();
   }, []);
 
-  // Initialize Speech Recognition Safely with Fallback Focus
+  // Initialize Speech Recognition Safely
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -159,16 +158,6 @@ function CounsellorChatContent() {
     setSpeakingMessageId(msgId);
     window.speechSynthesis.speak(utterance);
   };
-
-  useEffect(() => {
-    if (!authChecking && user && autoInsight === 'true' && !hasTriggeredInsight.current) {
-      hasTriggeredInsight.current = true;
-      router.replace('/counsellor');
-      
-      const prompt = "Please analyze my current active exams, syllabus progress, and career goals, and provide a strategic, actionable study plan based on my actual data.";
-      forceSubmit(null, prompt);
-    }
-  }, [authChecking, user, autoInsight, router]);
 
   const fetchUserSessions = async (userId: string) => {
     try {
@@ -425,6 +414,23 @@ function CounsellorChatContent() {
     }
   };
 
+  // 🔥 THE MAGIC FIX: Moved below forceSubmit so it has access to it safely.
+  // Using history.replaceState clears the URL without killing the fetch request!
+  useEffect(() => {
+    if (!authChecking && user && autoInsight === 'true' && !hasTriggeredInsight.current) {
+      hasTriggeredInsight.current = true;
+      
+      // Clear the URL parameter cleanly
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', '/counsellor');
+      }
+      
+      // Auto-trigger the Final Boss strategic prompt!
+      const prompt = "Please analyze my progress towards my Final Boss dream college and give me a strategic, actionable study plan based on my actual data.";
+      forceSubmit(null, prompt);
+    }
+  }, [authChecking, user, autoInsight]);
+
   if (authChecking) {
     return (
       <div className="flex h-[calc(100vh-6rem)] items-center justify-center font-black text-xl bg-white border-4 border-black rounded-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
@@ -646,7 +652,7 @@ function CounsellorChatContent() {
               {isListening ? <MicOff className="w-5 h-5 sm:w-6 sm:h-6 text-black" /> : <Mic className="w-5 h-5 sm:w-6 sm:h-6 text-black" />}
             </motion.button>
 
-            {/* Manual Text Box / Real-Time Voice Transcription Display (Fully Editable) */}
+            {/* Manual Text Box */}
             <input
               ref={inputRef}
               type="text"

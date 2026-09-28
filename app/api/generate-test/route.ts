@@ -37,7 +37,7 @@ Return ONLY a valid JSON object matching this schema with no extra text or markd
 
     const chatCompletion = await groq.chat.completions.create({
       messages: [{ role: 'user', content: prompt }],
-      model: 'llama-3.3-70b-versatile',
+      model: 'openai/gpt-oss-120b',
       temperature: 0.1, // Keep this very low for factual accuracy
       max_tokens: 2500,
     });

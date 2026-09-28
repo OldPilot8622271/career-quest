@@ -148,17 +148,18 @@ export default function ExamsPage() {
         body: JSON.stringify({ examName: examQuery })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data?.error || 'Failed to generate exam');
 
+      // 🔥 THE FIX: Bulletproof property extraction using optional chaining
       const newExam: Exam = {
         id: 'exam-' + Date.now(),
-        title: data.exam.title || examQuery,
-        stream: data.exam.stream || 'General',
-        examDate: data.exam.examDate || 'Check official bulletin',
-        applicationDeadline: data.exam.applicationDeadline || 'Check official bulletin',
-        eligibility: data.exam.eligibility || 'Check official bulletin',
+        title: data?.exam?.title || data?.title || examQuery,
+        stream: data?.exam?.stream || data?.stream || 'General',
+        examDate: data?.exam?.examDate || data?.examDate || 'Check official bulletin',
+        applicationDeadline: data?.exam?.applicationDeadline || data?.applicationDeadline || 'Check official bulletin',
+        eligibility: data?.exam?.eligibility || data?.eligibility || 'Check official bulletin',
         status: 'Planning',
-        officialWebsite: data.exam.officialWebsite || 'https://google.com'
+        officialWebsite: data?.exam?.officialWebsite || data?.officialWebsite || 'https://google.com'
       };
 
       const updatedExams = [newExam, ...exams];

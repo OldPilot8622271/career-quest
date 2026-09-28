@@ -174,8 +174,8 @@ export default function DashboardHomePage() {
           <div className="bg-[#A7F3D0] border-4 border-black p-6 rounded-3xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] relative">
             <div className="absolute -top-3 left-4 bg-black text-white text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full z-10 shadow-[2px_2px_0px_0px_rgba(255,255,255,1)]">AI INSIGHT</div>
             <p className="font-bold text-black leading-snug mt-2 text-sm">"Your progress towards {dreamCollege} is at {bossProgress}%. Let's discuss strategy!"</p>
-            <Link href="/counsellor" className="mt-4 font-black text-sm inline-flex items-center gap-1 hover:underline cursor-pointer text-black">
-              Discuss plan <ArrowRight className="w-4 h-4" />
+            <Link href="/counsellor?insight=true" className="mt-4 font-black text-sm inline-flex items-center gap-1 hover:underline cursor-pointer text-black">
+             Discuss plan <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
