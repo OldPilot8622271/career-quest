@@ -16,14 +16,16 @@ interface PaperAnalysis {
   questions: AnalyzedQuestion[];
 }
 
+const SUBJECTS = ['All Subjects', 'Physics', 'Chemistry', 'Mathematics'];
+
 export default function PaperAnalyzerPage() {
   const [previews, setPreviews] = useState<string[]>([]);
   const [base64Images, setBase64Images] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<PaperAnalysis | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string>('Physics');
 
-  // Compress high-res images to prevent API Payload crashes
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -33,21 +35,20 @@ export default function PaperAnalyzerPage() {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1200; // Safe resolution for AI OCR
+          const MAX_WIDTH = 1200;
           const scaleSize = MAX_WIDTH / img.width;
           canvas.width = MAX_WIDTH;
           canvas.height = img.height * scaleSize;
           
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compress to 70% quality
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
         };
         img.onerror = (error) => reject(error);
       };
     });
   };
 
-  // Convert PDFs directly to base64 without canvas
   const readFileAsBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -109,7 +110,8 @@ export default function PaperAnalyzerPage() {
       const res = await fetch('/api/analyze-paper', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ images: base64Images }),
+        // 🔥 Send the selected subject filter directly to the API
+        body: JSON.stringify({ images: base64Images, subject: selectedSubject }),
       });
 
       const data = await res.json();
@@ -148,7 +150,7 @@ export default function PaperAnalyzerPage() {
           <h1 className="text-3xl sm:text-4xl font-black mt-4 text-black flex items-center gap-2">
             Paper Analyzer <FileSearch className="w-8 h-8 text-black" />
           </h1>
-          <p className="font-bold text-lg mt-2 text-gray-900">Upload PDFs or snapshots of your past paper. AI will extract questions, identify topics, and generate hints.</p>
+          <p className="font-bold text-lg mt-2 text-gray-900">Upload PDFs or snapshots of your past paper. Select a subject tab to extract its full question list.</p>
         </div>
       </motion.div>
 
@@ -167,7 +169,6 @@ export default function PaperAnalyzerPage() {
               )}
             </div>
 
-            {/* MULTI-IMAGE PREVIEW GRID */}
             {previews.length > 0 && (
               <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
                 <AnimatePresence>
@@ -196,12 +197,32 @@ export default function PaperAnalyzerPage() {
               </div>
             )}
 
+            {/* 🔥 NEW: Subject Selector Tabs */}
+            <div className="space-y-2 mt-4">
+              <span className="block text-xs font-black uppercase text-gray-500">Target Subject</span>
+              <div className="flex flex-wrap gap-2">
+                {SUBJECTS.map((sub) => (
+                  <button
+                    key={sub}
+                    onClick={() => setSelectedSubject(sub)}
+                    className={`px-3 py-2 border-2 border-black rounded-lg text-xs font-black uppercase transition-colors cursor-pointer shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
+                      selectedSubject === sub 
+                        ? 'bg-[#FCA5A5] text-black translate-y-[2px] shadow-none' 
+                        : 'bg-white hover:bg-[#FAF8F5] text-gray-700'
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={analyzePaper}
               disabled={base64Images.length === 0 || loading}
-              className="w-full bg-[#A7F3D0] border-4 border-black py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50 cursor-pointer transition-all hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black mt-4"
+              className="w-full bg-[#A7F3D0] border-4 border-black py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] disabled:opacity-50 cursor-pointer transition-all hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black mt-2"
             >
               {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}
               {loading ? 'SCANNING...' : 'ANALYZE'}
@@ -222,7 +243,7 @@ export default function PaperAnalyzerPage() {
           {loading && (
              <div className="bg-[#FAF8F5] border-4 border-black p-12 rounded-3xl text-center space-y-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] h-full flex flex-col items-center justify-center">
                <Loader2 className="w-16 h-16 text-black animate-spin" />
-               <h2 className="text-2xl font-black animate-pulse">Vision AI is reading...</h2>
+               <h2 className="text-2xl font-black animate-pulse">Extracting {selectedSubject}...</h2>
              </div>
           )}
 
@@ -231,6 +252,11 @@ export default function PaperAnalyzerPage() {
               <div className="bg-black text-white border-4 border-black p-4 rounded-2xl shadow-[4px_4px_0px_0px_rgba(0,0,0,0.5)]">
                 <span className="text-[10px] font-black uppercase text-gray-400">Document Summary</span>
                 <p className="font-bold text-sm mt-1">{analysis.paperSummary}</p>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="bg-white text-black text-[10px] font-black uppercase px-2 py-1 rounded">
+                    Total Extracted: {analysis.questions.length} Qs
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-4">
