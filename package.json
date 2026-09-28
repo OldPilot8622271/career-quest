@@ -12,6 +12,7 @@
     "@ai-sdk/google": "^4.0.57",
     "@ai-sdk/react": "^4.0.87",
     "@google/genai": "^2.19.0",
+    "@google/generative-ai": "^0.24.1",
     "@tailwindcss/typography": "^0.5.20",
     "ai": "^7.0.84",
     "clsx": "^2.1.1",

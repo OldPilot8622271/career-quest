@@ -23,7 +23,7 @@ export default function PaperAnalyzerPage() {
   const [analysis, setAnalysis] = useState<PaperAnalysis | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // 🔥 THE FIX: Compress high-res images to prevent API Payload crashes
+  // Compress high-res images to prevent API Payload crashes
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -47,6 +47,16 @@ export default function PaperAnalyzerPage() {
     });
   };
 
+  // Convert PDFs directly to base64 without canvas
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -56,13 +66,16 @@ export default function PaperAnalyzerPage() {
     const newBase64s: string[] = [...base64Images];
 
     for (const file of files) {
-      // 🔥 THE FIX: Catch PDFs and Word docs to explain Vision requirements
-      if (file.type.includes('pdf') || file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.pdf')) {
-        setErrorMsg("To process PDFs or Word documents, please take screenshots of the pages and upload them as images. Vision AI natively requires JPG/PNG formats!");
+      if (file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+        setErrorMsg("To process Word documents, please save them as a PDF first.");
         continue;
       }
 
-      if (file.type.startsWith('image/')) {
+      if (file.type === 'application/pdf') {
+        const base64 = await readFileAsBase64(file);
+        newPreviews.push('https://upload.wikimedia.org/wikipedia/commons/8/87/PDF_file_icon.svg'); 
+        newBase64s.push(base64);
+      } else if (file.type.startsWith('image/')) {
         const compressedBase64 = await compressImage(file);
         newPreviews.push(URL.createObjectURL(file));
         newBase64s.push(compressedBase64);
@@ -109,7 +122,7 @@ export default function PaperAnalyzerPage() {
       }
     } catch (err: any) {
       console.error("Failed to analyze paper:", err);
-      setErrorMsg(err.message || "Failed to analyze the images. Please try again.");
+      setErrorMsg(err.message || "Failed to analyze the files. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -135,7 +148,7 @@ export default function PaperAnalyzerPage() {
           <h1 className="text-3xl sm:text-4xl font-black mt-4 text-black flex items-center gap-2">
             Paper Analyzer <FileSearch className="w-8 h-8 text-black" />
           </h1>
-          <p className="font-bold text-lg mt-2 text-gray-900">Upload snapshots of your past paper. AI will extract questions, identify topics, and generate hints.</p>
+          <p className="font-bold text-lg mt-2 text-gray-900">Upload PDFs or snapshots of your past paper. AI will extract questions, identify topics, and generate hints.</p>
         </div>
       </motion.div>
 
@@ -146,9 +159,9 @@ export default function PaperAnalyzerPage() {
           <div className="bg-white border-4 border-black p-6 rounded-3xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] space-y-4 flex flex-col">
             
             <div className="flex items-center justify-between">
-              <h3 className="font-black text-lg uppercase">Pages ({previews.length})</h3>
+              <h3 className="font-black text-lg uppercase">Files ({previews.length})</h3>
               {previews.length > 0 && (
-                <button onClick={clearAll} className="text-xs font-black uppercase bg-red-200 border-2 border-black px-2 py-1 rounded hover:bg-red-300 transition-colors">
+                <button onClick={clearAll} className="text-xs font-black uppercase bg-red-200 border-2 border-black px-2 py-1 rounded hover:bg-red-300 transition-colors cursor-pointer">
                   Clear All
                 </button>
               )}
@@ -159,9 +172,9 @@ export default function PaperAnalyzerPage() {
               <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
                 <AnimatePresence>
                   {previews.map((src, idx) => (
-                    <motion.div key={idx} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="relative border-4 border-black rounded-xl overflow-hidden aspect-[3/4]">
-                      <img src={src} alt={`Page ${idx + 1}`} className="w-full h-full object-cover" />
-                      <button onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-white border-2 border-black rounded-full p-1 hover:bg-red-200">
+                    <motion.div key={idx} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="relative border-4 border-black rounded-xl overflow-hidden aspect-[3/4] flex items-center justify-center bg-gray-50">
+                      <img src={src} alt={`File ${idx + 1}`} className="w-full h-full object-cover" />
+                      <button onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-white border-2 border-black rounded-full p-1 hover:bg-red-200 cursor-pointer">
                         <X className="w-3 h-3" />
                       </button>
                     </motion.div>
@@ -172,8 +185,8 @@ export default function PaperAnalyzerPage() {
 
             <label className="w-full h-24 border-4 border-black border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-[#FAF8F5] hover:bg-[#BFDBFE] transition-colors group mt-2">
               <UploadCloud className="w-6 h-6 text-gray-400 group-hover:text-black mb-1" />
-              <span className="font-black text-sm uppercase">Add Pages / Docs</span>
-              <input type="file" accept="image/*,application/pdf,.doc,.docx" multiple className="hidden" onChange={handleFileUpload} />
+              <span className="font-black text-sm uppercase">Add Images or PDF</span>
+              <input type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleFileUpload} />
             </label>
 
             {errorMsg && (
@@ -202,7 +215,7 @@ export default function PaperAnalyzerPage() {
              <div className="bg-white border-4 border-black p-12 rounded-3xl text-center space-y-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] h-full flex flex-col items-center justify-center opacity-70">
                <FileText className="w-16 h-16 text-gray-300" />
                <h2 className="text-2xl font-black">Awaiting Document</h2>
-               <p className="font-bold text-gray-500 max-w-sm">Upload one or more images of your exam paper on the left to see the AI breakdown here.</p>
+               <p className="font-bold text-gray-500 max-w-sm">Upload a PDF or images of your exam paper on the left to see the AI breakdown here.</p>
              </div>
           )}
 
