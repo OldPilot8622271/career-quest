@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import { motion, Variants, AnimatePresence } from 'framer-motion';
 import { FileSearch, UploadCloud, Loader2, Sparkles, HelpCircle, FileText, X, AlertCircle, BookOpen } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 interface AnalyzedQuestion {
   questionText: string;
@@ -337,9 +341,14 @@ export default function PaperAnalyzerPage() {
                         <span className="block text-[10px] font-black uppercase text-blue-800 mb-2 flex items-center gap-1">
                           <BookOpen className="w-3 h-3" /> Expert Explanation
                         </span>
-                        <p className="text-sm font-bold text-gray-900 leading-relaxed whitespace-pre-wrap">
+                        <div className="text-sm font-bold text-gray-900 leading-relaxed overflow-x-auto space-y-2">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkMath]} 
+                          rehypePlugins={[rehypeKatex]}
+                        >
                           {q.explanation}
-                        </p>
+                        </ReactMarkdown>
+                      </div>
                       </motion.div>
                     )}
                   </div>
