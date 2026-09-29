@@ -61,13 +61,14 @@ function CounsellorChatContent() {
   }, []);
 
   // Initialize Speech Recognition Safely
+// Initialize Speech Recognition Safely
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         try {
           const recognition = new SpeechRecognition();
-          recognition.continuous = false;
+          recognition.continuous = true; // 🔥 FIX: Keeps listening even if the user pauses
           recognition.interimResults = true;
           recognition.lang = 'en-US';
 
@@ -79,10 +80,15 @@ function CounsellorChatContent() {
           };
 
           recognition.onerror = (event: any) => {
-            console.warn('Speech recognition network/permission warning:', event.error);
+            console.warn('Speech recognition warning:', event.error);
             setIsListening(false);
+            if (event.error === 'not-allowed') {
+               setError("Microphone access blocked. Please allow mic permissions in your browser address bar.");
+               setTimeout(() => setError(null), 5000);
+            }
           };
 
+          // We remove the onend auto-cutoff so the user dictates when to stop
           recognition.onend = () => {
             setIsListening(false);
           };
@@ -104,17 +110,24 @@ function CounsellorChatContent() {
   const toggleListening = () => {
     if (!recognitionRef.current) {
       inputRef.current?.focus();
-      setError("Voice dictation unavailable in this browser environment. You can type directly below!");
+      setError("Voice dictation is unavailable in this browser. Please use Chrome or Edge.");
       setTimeout(() => setError(null), 4000);
       return;
     }
 
     if (isListening) {
+      // User clicked mic to STOP talking
       try {
         recognitionRef.current.stop();
       } catch (err) {}
       setIsListening(false);
+      
+      // 🔥 FIX: Auto-submit the captured voice text instantly to the AI
+      if (text.trim()) {
+        forceSubmit(null, text);
+      }
     } else {
+      // User clicked mic to START talking
       setText('');
       try {
         recognitionRef.current.start();

@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 
 export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// 🔥 Initialize Groq using the key already in your .env.local
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
 
 export async function POST(req: Request) {
   try {
@@ -22,22 +25,18 @@ Provide a clear, step-by-step explanatory answer. Do not just give the final ans
 
 Return ONLY a valid JSON object matching this exact schema:
 {
-  "explanation": "Your detailed, step-by-step explanation here (formatted as a clean, readable string)..."
+  "explanation": "Your detailed, step-by-step explanation here (formatted as a clean, readable string using LaTeX for math equations if needed)..."
 }`;
 
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-3.5-flash-lite', 
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.2,
-      }
+    // 🔥 Call the Groq API with your requested OSS model
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'gpt-oss-120b', // The requested model
+      response_format: { type: 'json_object' }, // Ensures the output doesn't break your frontend parsing
+      temperature: 0.2,
     });
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let rawContent = response.text().trim();
-    
-    rawContent = rawContent.replace(/```json/gi, '').replace(/```/gi, '').trim();
+    const rawContent = chatCompletion.choices[0]?.message?.content || '{}';
     const parsedData = JSON.parse(rawContent);
 
     return NextResponse.json({ explanation: parsedData.explanation });
