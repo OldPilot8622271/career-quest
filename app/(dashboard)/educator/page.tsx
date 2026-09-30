@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
-import { Sparkles, Send, Layers, ArrowRight, Camera, X, Image as ImageIcon } from 'lucide-react';
+import { Sparkles, Send, Layers, ArrowRight, Camera, X, Image as ImageIcon, Mic, MicOff } from 'lucide-react';
 import Link from 'next/link';
 
 // Formatting tools for math and beautiful text
@@ -52,6 +52,11 @@ export default function AIEducatorPage() {
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 🔥 Voice State & Refs
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
@@ -70,7 +75,76 @@ export default function AIEducatorPage() {
     });
 
     return () => unsub();
+  }, [selectedTopic, isCustomTopic]);
+
+  // 🔥 Initialize Speech Recognition Safely
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = 'en-US';
+
+          recognition.onresult = (event: any) => {
+            const transcript = Array.from(event.results)
+              .map((result: any) => result[0].transcript)
+              .join('');
+            setInputQuery(transcript);
+          };
+
+          recognition.onerror = (event: any) => {
+            console.warn('Speech recognition warning:', event.error);
+            if (event.error === 'no-speech') {
+               return; // Ignore silence timeouts!
+            }
+            setIsListening(false);
+            if (event.error === 'not-allowed') {
+               alert("Microphone access blocked. Please allow mic permissions in your browser.");
+            }
+          };
+
+          recognition.onend = () => {
+            setIsListening(false);
+          };
+
+          recognitionRef.current = recognition;
+        } catch (e) {
+          console.warn("Speech recognition initialization skipped.");
+        }
+      }
+    }
   }, []);
+
+  // 🔥 Toggle Listening Function (With Abort Fix)
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      inputRef.current?.focus();
+      alert("Voice dictation is unavailable in this browser. Please use Chrome or Edge.");
+      return;
+    }
+
+    if (isListening) {
+      // User clicked mic to STOP talking
+      try {
+        recognitionRef.current.abort(); // Instantly kill engine to prevent ghost typing
+      } catch (err) {}
+      setIsListening(false);
+    } else {
+      // User clicked mic to START talking
+      setInputQuery('');
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+        inputRef.current?.focus();
+      } catch (err: any) {
+        setIsListening(false);
+        inputRef.current?.focus();
+      }
+    }
+  };
 
   // Handle Image Selection and Base64 Conversion
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,6 +171,13 @@ export default function AIEducatorPage() {
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+
+    // Turn off mic if they submit while talking
+    if (isListening && recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch(err){}
+      setIsListening(false);
+    }
+
     if ((!inputQuery.trim() && !attachedImage) || loading) return;
 
     const user = auth.currentUser;
@@ -366,7 +447,7 @@ export default function AIEducatorPage() {
           )}
         </div>
 
-        {/* Input Bar with Image Attachments */}
+        {/* Input Bar with Voice & Image Attachments */}
         <div className="p-4 border-t-4 border-black bg-white flex flex-col gap-3">
           
           {/* Image Preview Box */}
@@ -386,7 +467,7 @@ export default function AIEducatorPage() {
             )}
           </AnimatePresence>
 
-          <form onSubmit={handleSendMessage} className="flex gap-2">
+          <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
             <input 
               type="file" 
               accept="image/*" 
@@ -407,12 +488,29 @@ export default function AIEducatorPage() {
               <Camera className="w-5 h-5" />
             </motion.button>
 
+            {/* 🔥 NEW: Microphone Toggle Button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              type="button"
+              onClick={toggleListening}
+              className={`p-3 rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer flex items-center justify-center shrink-0 transition-colors ${
+                isListening ? 'bg-red-400 animate-pulse' : 'bg-[#A7F3D0]'
+              }`}
+              title={isListening ? "Listening... click to stop" : "Click to speak"}
+            >
+              {isListening ? <MicOff className="w-5 h-5 text-black" /> : <Mic className="w-5 h-5 text-black" />}
+            </motion.button>
+
             <input
+              ref={inputRef}
               type="text"
               value={inputQuery}
               onChange={(e) => setInputQuery(e.target.value)}
-              placeholder="Ask a question or snap a photo of a problem..."
-              className="flex-1 bg-[#FAF8F5] border-2 border-black rounded-xl px-4 py-3 font-bold text-sm focus:outline-none shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+              placeholder={isListening ? "Listening to your voice..." : "Ask a question or snap a photo..."}
+              className={`flex-1 bg-[#FAF8F5] border-2 border-black rounded-xl px-4 py-3 font-bold text-sm focus:outline-none shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-colors ${
+                isListening ? 'border-red-400 placeholder:text-red-500' : ''
+              }`}
             />
             
             <motion.button

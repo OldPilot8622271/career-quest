@@ -81,6 +81,12 @@ function CounsellorChatContent() {
 
           recognition.onerror = (event: any) => {
             console.warn('Speech recognition warning:', event.error);
+            
+            // 🔥 FIX: Ignore Chrome's 'no-speech' timeout so it doesn't turn the mic off!
+            if (event.error === 'no-speech') {
+               return; 
+            }
+
             setIsListening(false);
             if (event.error === 'not-allowed') {
                setError("Microphone access blocked. Please allow mic permissions in your browser address bar.");
@@ -107,7 +113,7 @@ function CounsellorChatContent() {
     };
   }, []);
 
-  const toggleListening = () => {
+const toggleListening = () => {
     if (!recognitionRef.current) {
       inputRef.current?.focus();
       setError("Voice dictation is unavailable in this browser. Please use Chrome or Edge.");
@@ -118,14 +124,12 @@ function CounsellorChatContent() {
     if (isListening) {
       // User clicked mic to STOP talking
       try {
-        recognitionRef.current.stop();
+        // 🔥 FIX: Use abort() to instantly kill the engine and stop ghost text
+        recognitionRef.current.abort(); 
       } catch (err) {}
+      
       setIsListening(false);
       
-      // 🔥 FIX: Auto-submit the captured voice text instantly to the AI
-      if (text.trim()) {
-        forceSubmit(null, text);
-      }
     } else {
       // User clicked mic to START talking
       setText('');
@@ -139,7 +143,7 @@ function CounsellorChatContent() {
       }
     }
   };
-
+  
   const cleanTextForSpeech = (rawText: string) => {
     return rawText
       .replace(/\[.*?\]\(.*?\)/g, '') 
